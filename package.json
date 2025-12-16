@@ -1,0 +1,25 @@
+{
+  "name": "uaairraidnotificator-tgbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lumal3e/UAAirRaidNotificator-TGBot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Lumal3e/UAAirRaidNotificator-TGBot/issues"
+  },
+  "homepage": "https://github.com/Lumal3e/UAAirRaidNotificator-TGBot#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "grammy": "^1.38.4",
+    "nodemon": "^3.1.11"
+  }
+}
