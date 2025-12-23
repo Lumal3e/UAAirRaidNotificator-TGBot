@@ -1,0 +1,50 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Channel {
+  id         BigInt         @id // telegram channel ID
+  title      String?
+  type       String
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  subscribes Subscribe[]
+}
+
+enum Type {
+  group
+  channel
+}
+
+model Region {
+  id            Int         @id @default(autoincrement())
+  apiId         Int         @unique
+  name          String
+  isAlertActive Boolean     @default(false)
+  subscribes    Subscribe[]
+}
+
+model Subscribe {
+  channel     Channel  @relation(fields: [channelId], references: [id])
+  channelId  BigInt
+  region      Region   @relation(fields: [regionId], references: [id])
+  regionId   Int
+  customAlert String?
+  customCalm  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@id([channelId, regionId])
+}
