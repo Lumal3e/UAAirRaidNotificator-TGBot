@@ -21,12 +21,15 @@
   },
   "homepage": "https://github.com/Lumal3e/UAAirRaidNotificator-TGBot#readme",
   "dependencies": {
+    "@grammyjs/auto-retry": "^2.0.2",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
     "axios": "^1.13.2",
+    "bullmq": "^5.66.3",
     "csv-parse": "^6.1.0",
     "dotenv": "^17.2.3",
     "grammy": "^1.38.4",
+    "ioredis": "^5.8.2",
     "pg": "^8.16.3"
   },
   "devDependencies": {

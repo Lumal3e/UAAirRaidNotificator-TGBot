@@ -1,6 +1,8 @@
 import { Bot } from "grammy";
 import axios from "axios";
 import { prisma } from "./prisma.js"
+import { notificationQueue } from "../queue/producer.js";
+
 interface ApiAlert {
     location_uid: string;
     alert_type: "air_raid" | "artillery_shelling" | "urban_fights" | "chemical" | "nuclear";
@@ -80,7 +82,7 @@ export class AlertPoller {
                 });
                 // Create notification
                 const message = `Alert started in ${region.name}!\nType: ${apiAlert!.alert_type}\nStarted at: ${apiAlert!.started_at}`;
-                await this.notifySubscribers(region.subscribes, message)
+                await this.notifySubscribers(region.subscribes, message);
             }   
             else if (!isAlertActive && wasAlertActive) {
                 // Alert ended
@@ -92,6 +94,7 @@ export class AlertPoller {
                 });
                 // Create notification
                 const message = `Alert ended in ${region.name}\nEnded at: ${new Date().toISOString()}`
+                await this.notifySubscribers(region.subscribes, message);
             }
 
         }
@@ -100,13 +103,17 @@ export class AlertPoller {
             if (!subscribers || subscribers.length === 0) {
                 return;
             }
-            console.log(`Notifying ${subscribers.length} subbscribers`);
-            for (const sub of subscribers) {
-                try {
-                    await this.bot.api.sendMessage(String(sub.channelId), message);
-                } catch (error) {
-                    console.error(`Failed to send message to subscriber ${sub.channelId}`, error);
+            console.log(`Adding ${subscribers.length} notification to queue`);
+            const jobs = subscribers.map(sub => ({
+                name: "sendNotification",
+                data: {
+                    channelId: String(sub.channelId),
+                    message: message
                 }
-            }
+            }));
+
+            await notificationQueue.addBulk(jobs);
+
+            console.log(`Successfully added ${subscribers.length} jobs to Redis queue`);
         }
 }

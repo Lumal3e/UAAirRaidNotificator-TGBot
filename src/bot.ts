@@ -1,9 +1,17 @@
 import { Bot } from "grammy";
+import { autoRetry } from "@grammyjs/auto-retry";
 import { AlertPoller } from "./services/poller.js";
 import { ChannelService } from "./services/channel.service.js";
 import subscribtionHandler from "./handlers/subscription.js";
+import { startWorker } from "./queue/worker.js";
 
 const bot = new Bot(process.env.BOT_TOKEN!);
+
+// auto retry
+bot.api.config.use(autoRetry({
+  maxRetryAttempts: 2,
+  maxDelaySeconds: 10
+}));
 
 // deleting bot or updating status
 bot.on("my_chat_member", async (ctx) => {
@@ -29,8 +37,12 @@ bot.command("start", async (ctx) => {
 // subscription commands
 bot.use(subscribtionHandler);
 
-// start bot and pooler
+// initialize poller
 const poller = new AlertPoller(bot);
+
+// initialize worker
+startWorker(bot);
+console.log("Worker started");
 
 bot.start({
   onStart: (botInfo) => {
