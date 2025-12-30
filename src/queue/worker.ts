@@ -14,7 +14,9 @@ export const startWorker = (bot: Bot) => {
         const { channelId, message } = job.data;
 
         try {
-            await bot.api.sendMessage(channelId, message);
+            await bot.api.sendMessage(channelId, message, {
+                parse_mode: "HTML"
+            });
         } catch (error) {
             if (error instanceof GrammyError) {
                 if (error.error_code === 403 || error.description.includes("blocked")) {

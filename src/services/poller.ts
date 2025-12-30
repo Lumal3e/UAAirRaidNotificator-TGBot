@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import axios from "axios";
 import { prisma } from "./prisma.js"
 import { notificationQueue } from "../queue/producer.js";
+import { formatTime, getReadableAlertType, formatMessage } from "./utils.js";
 
 interface ApiAlert {
     location_uid: string;
@@ -64,56 +65,83 @@ export class AlertPoller {
             activeApiAlerts.set(parseInt(alert.location_uid), alert);
         }
         const dbRegions = await prisma.region.findMany({
-            include: { subscribes: true}
+            include: { subscribes: {
+                include: { channel: true }
+            }}
         });
 
         for (const region of dbRegions) {
             const apiAlert = activeApiAlerts.get(region.apiId);
             const isAlertActive = !!apiAlert;
             const wasAlertActive = region.isAlertActive;
-
+            const baseVars = {
+                region: region.name,
+                type: getReadableAlertType(apiAlert?.alert_type)
+            };
             if (isAlertActive && !wasAlertActive) {
                 // Alert started
-                console.log(`Alert started for region ${region.name} at ${new Date().toISOString()}`);
+                console.log(`Alert started for region ${region.name} at ${formatTime(apiAlert!.started_at)}`);
                 // Update DB
                 await prisma.region.update({
                     where: { id: region.id },
                     data: { isAlertActive: true }
                 });
+                // add time variable
+                const templateVars = {
+                    ...baseVars,
+                    time: formatTime(apiAlert!.started_at)
+                };
                 // Create notification
-                const message = `Alert started in ${region.name}!\nType: ${apiAlert!.alert_type}\nStarted at: ${apiAlert!.started_at}`;
-                await this.notifySubscribers(region.subscribes, message);
+                await this.notifySubscribers(region.subscribes, "start", templateVars);
             }   
             else if (!isAlertActive && wasAlertActive) {
                 // Alert ended
-                console.log(`Alert ended for region ${region.name} at ${new Date().toISOString()}`);
+                console.log(`Alert ended for region ${region.name} at ${formatTime()}`);
                 // Update DB
                 await prisma.region.update({
                     where: { id: region.id },
                     data: { isAlertActive: false }
                 });
+                // add time variable
+                const templateVars = {
+                    ...baseVars,
+                    time: formatTime()
+                };
                 // Create notification
-                const message = `Alert ended in ${region.name}\nEnded at: ${new Date().toISOString()}`
-                await this.notifySubscribers(region.subscribes, message);
+                await this.notifySubscribers(region.subscribes, "end", templateVars);
             }
 
         }
     }
-    private async notifySubscribers(subscribers: any[], message: string) {
+
+    private async notifySubscribers(subscribers: any[], 
+        eventType: "start" | "end", 
+        vars: { region: string, time: string, type: string }) {
             if (!subscribers || subscribers.length === 0) {
                 return;
             }
-            console.log(`Adding ${subscribers.length} notification to queue`);
-            const jobs = subscribers.map(sub => ({
-                name: "sendNotification",
-                data: {
-                    channelId: String(sub.channelId),
-                    message: message
+            const defaulStartTemplate = "🔴 <b>{type}!</b>\nОбласть: {region}!\nЧас: {time}";
+            const defaultEndTemplate = "🟢 <b>Відбій тривоги!</b>\nОбласть: {region}!\nЧас: {time}";
+            for (const sub of subscribers) {
+                if (!sub.channel.isActive) {
+                    continue;
                 }
-            }));
-
-            await notificationQueue.addBulk(jobs);
-
-            console.log(`Successfully added ${subscribers.length} jobs to Redis queue`);
+                try {
+                    let template = "";
+                    if (eventType === "start") {
+                        template = sub.customAlert ?? defaulStartTemplate;
+                    }
+                    else {
+                        template = sub.customCalm ?? defaultEndTemplate;
+                    }
+                    const message = formatMessage(template, vars);
+                    await notificationQueue.add("sendNotification", {
+                        channelId: String(sub.channelId),
+                        message: message
+                    });
+                } catch (error) {
+                    console.error(`Failed to queue notification for channel ${sub.channelId}:`, error);
+                }
+            }
         }
 }
